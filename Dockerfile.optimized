@@ -1,0 +1,16 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Copy only manifest files first so this layer is cached
+# whenever application source changes but dependencies do not.
+COPY package.json package-lock.json ./
+
+RUN npm ci --omit=dev
+
+COPY src ./src
+
+ENV NODE_ENV=production
+EXPOSE 3000
+
+CMD ["node", "src/server.js"]
