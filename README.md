@@ -33,7 +33,7 @@ by three students within a single session.
 ```
 Developer
    ↓
-GitHub  (source control, triggers Jenkins via SCM)
+GitHub  (source control, triggers Jenkins via webhook on every push)
    ↓
 Jenkins  (running locally on Windows, port 8080)
    ↓
