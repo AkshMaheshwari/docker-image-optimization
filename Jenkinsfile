@@ -2,8 +2,12 @@ pipeline {
     agent any
 
     parameters {
-        string(name: 'DOCKERHUB_USERNAME', defaultValue: 'your-dockerhub-username', description: 'Docker Hub username (not secret)')
+        string(name: 'DOCKERHUB_USERNAME', defaultValue: 'akshm23', description: 'Docker Hub username (not secret)')
         string(name: 'DOCKERHUB_REPOSITORY', defaultValue: 'docker-image-optimization', description: 'Docker Hub repository name')
+    }
+
+    triggers {
+        githubPush()
     }
 
     environment {

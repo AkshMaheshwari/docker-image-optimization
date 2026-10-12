@@ -342,10 +342,10 @@ This was verified working end-to-end on 2026-09-18: Jenkins build succeeded
 deploy ID, and the public URL served both `/` and `/health` correctly after
 the redeploy completed.
 
-### Planned: build automatically on every push (GitHub webhook)
+### Build automatically on every push (GitHub webhook)
 
-Currently builds are triggered manually with **Build with Parameters**. The
-plan is to have GitHub notify Jenkins on every push via a webhook. Because
+Every push to GitHub notifies Jenkins via a webhook and starts a build
+(manual **Build with Parameters** still works too). Because
 Jenkins runs on `localhost:8080`, GitHub can't reach it directly, so it is
 exposed through **ngrok**.
 
