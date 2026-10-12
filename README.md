@@ -80,7 +80,9 @@ To build and run this project locally you need:
 
 ## 5. Local Application Setup
 
-```bash
+Commands below are PowerShell (this project was built and demoed on Windows).
+
+```powershell
 git clone https://github.com/AkshMaheshwari/docker-image-optimization.git
 cd docker-image-optimization
 npm install
@@ -88,19 +90,26 @@ npm start
 ```
 
 The server starts on `http://localhost:3000` (or the port set in the `PORT`
-environment variable). Verify it manually:
+environment variable). Open a **second** PowerShell window to verify it
+(the first one is busy running the server):
 
-```bash
-curl http://localhost:3000/
-curl http://localhost:3000/health
+```powershell
+Invoke-WebRequest -Uri "http://localhost:3000/" -UseBasicParsing
+Invoke-RestMethod -Uri "http://localhost:3000/health"
 ```
 
 Expected: an HTML page saying "Docker Image Optimization Demo", and
-`{"status":"healthy"}` from `/health`.
+`{"status":"healthy"}` from `/health`. Stop the server with `Ctrl+C` in the
+first window when done.
+
+> **Note:** PowerShell aliases `curl` to `Invoke-WebRequest`, which doesn't
+> accept the same flags as real curl. Use `Invoke-WebRequest` /
+> `Invoke-RestMethod` as shown above, or call `curl.exe` explicitly if you
+> want actual curl syntax.
 
 ## 6. Running Tests
 
-```bash
+```powershell
 npm test
 ```
 
@@ -117,16 +126,17 @@ covering:
 practices for comparison purposes: a full `node:latest` base image, no
 `.dockerignore` awareness, and `npm install` (including dev dependencies).
 
-```bash
+```powershell
 docker build -f Dockerfile.baseline -t docker-image-optimization:baseline .
 ```
 
 ## 8. Running the Baseline Image
 
-```bash
+```powershell
 docker run -d -p 3001:3000 --name baseline-test docker-image-optimization:baseline
-curl http://localhost:3001/
-curl http://localhost:3001/health
+Start-Sleep -Seconds 2
+Invoke-WebRequest -Uri "http://localhost:3001/" -UseBasicParsing
+Invoke-RestMethod -Uri "http://localhost:3001/health"
 docker rm -f baseline-test
 ```
 
@@ -150,16 +160,17 @@ sense for this specific application:
   `--omit=dev` and `.dockerignore` don't already exclude. Adding one would be
   complexity without benefit.
 
-```bash
+```powershell
 docker build -f Dockerfile.optimized -t docker-image-optimization:optimized .
 ```
 
 ## 10. Running the Optimized Image
 
-```bash
+```powershell
 docker run -d -p 3002:3000 --name optimized-test docker-image-optimization:optimized
-curl http://localhost:3002/
-curl http://localhost:3002/health
+Start-Sleep -Seconds 2
+Invoke-WebRequest -Uri "http://localhost:3002/" -UseBasicParsing
+Invoke-RestMethod -Uri "http://localhost:3002/health"
 docker rm -f optimized-test
 ```
 
@@ -169,17 +180,24 @@ build.
 
 ## 11. Comparing the Images
 
-Run the provided benchmarking script from the project root:
+Run the provided benchmarking script from the project root (PowerShell):
 
-```bash
-bash scripts/benchmark.sh
+```powershell
+.\scripts\benchmark.ps1
 ```
 
-This rebuilds both images with `--no-cache` and reports build time, image
-size, and layer count for each ([scripts/benchmark.sh](scripts/benchmark.sh)).
-You can also inspect them manually:
+> A bash version also exists at [scripts/benchmark.sh](scripts/benchmark.sh)
+> for macOS/Linux. On Windows, do **not** run it by typing `bash
+> scripts/benchmark.sh` from PowerShell — that launches your default WSL
+> distro, which usually doesn't have Docker Desktop's WSL integration enabled
+> and will fail with "docker could not be found." Use `.\scripts\benchmark.ps1`
+> instead, or run the bash script from an actual **Git Bash** terminal, which
+> has Docker Desktop's Windows CLI on its PATH already.
 
-```bash
+This rebuilds both images with `--no-cache` and reports build time, image
+size, and layer count for each. You can also inspect them manually:
+
+```powershell
 docker images docker-image-optimization
 docker history docker-image-optimization:baseline
 docker history docker-image-optimization:optimized
@@ -190,7 +208,7 @@ docker history docker-image-optimization:optimized
 | Metric | Baseline | Optimized |
 |---|---|---|
 | Image size | 1.85 GB | **202 MB** (~9x smaller) |
-| Build time (`--no-cache`) | 9s | 4s |
+| Build time (`--no-cache`) | 9–15s | 4–6s |
 | Total layers | 15 | 16 |
 
 **Note on layer count:** total layer count includes the base image's own
@@ -324,30 +342,71 @@ This was verified working end-to-end on 2026-09-18: Jenkins build succeeded
 deploy ID, and the public URL served both `/` and `/health` correctly after
 the redeploy completed.
 
+### Planned: build automatically on every push (GitHub webhook)
+
+Currently builds are triggered manually with **Build with Parameters**. The
+plan is to have GitHub notify Jenkins on every push via a webhook. Because
+Jenkins runs on `localhost:8080`, GitHub can't reach it directly, so it is
+exposed through **ngrok**.
+
+1. **Jenkinsfile changes:**
+   - Change the `DOCKERHUB_USERNAME` default from `your-dockerhub-username`
+     to `akshm23`. Webhook-triggered builds can't prompt for parameters, so
+     they run with the defaults.
+   - Add a trigger below the `parameters { }` block:
+     ```groovy
+     triggers {
+         githubPush()
+     }
+     ```
+2. **Jenkins:** confirm the **GitHub plugin** is installed (Manage Jenkins →
+   Plugins → Installed).
+3. **ngrok:** `ngrok http 8080`, then copy the `https://xxxx.ngrok-free.app`
+   URL. Claim a free static domain in the ngrok dashboard so the URL doesn't
+   change on every restart.
+4. **GitHub:** repo → Settings → Webhooks → Add webhook
+   - Payload URL: `https://xxxx.ngrok-free.app/github-webhook/` (trailing
+     slash required)
+   - Content type: `application/json`
+   - Events: **Just the push event**
+5. **Verify:** push a commit. The build should start within seconds, and
+   GitHub's webhook page should show a green tick on the delivery.
+
+**Security:** ngrok exposes Jenkins to the public internet. Make sure login
+is required and anonymous users have no access (Manage Jenkins → Security).
+
+**Alternative without ngrok:** `triggers { pollSCM('H/5 * * * *') }` makes
+Jenkins check GitHub for new commits every 5 minutes. It works on localhost
+but isn't instant.
+
 ## 18. Team Responsibilities
 
-_Fill in your team's actual names and division of work below — this is a
-group project of 3 students._
-
-| Area | Responsible |
+| Member | Area |
 |---|---|
-| Application development (Express app, routes) | _TODO_ |
-| Automated testing (Jest/Supertest) | _TODO_ |
-| Dockerization (baseline + optimized images, benchmarking) | _TODO_ |
-| Jenkins pipeline & CI/CD configuration | _TODO_ |
-| Docker Hub & Render deployment configuration | _TODO_ |
-| Documentation & demo preparation | _TODO_ |
+| Aksh | Dockerization (baseline + optimized images, benchmarking), Jenkins pipeline & CI/CD configuration |
+| Sanjana | Application development (Express app, routes), automated testing (Jest/Supertest) |
+| Samiksha | Docker Hub & Render deployment, GitHub webhook setup, documentation & demo preparation |
 
 ## 19. Expected Demonstration Flow
 
-A suggested order for a live demo:
+A suggested order for a live demo (full script with talking points:
+[DEMO.md](DEMO.md)):
 
+0. **Before the demo:** remove previously built project images so everything
+   is built from scratch live. Keep the `node` base images cached so the
+   demo doesn't depend on a ~1 GB download:
+   ```powershell
+   docker images --format "{{.Repository}}:{{.Tag}}" | Select-String "docker-image-optimization" | ForEach-Object { docker rmi -f $_.Line }
+   docker builder prune -f
+   ```
 1. Show the repo structure and explain the architecture diagram (Section 2)
-2. Run `npm test` locally to show the automated test suite passing
-3. Build both Dockerfiles live (or show pre-built results) and run
-   `scripts/benchmark.sh` to show the real size/build-time difference
-4. Open Jenkins, trigger a build with parameters, and narrate each stage as
-   it goes green in the console output
+2. Run `npm start` and `npm test` locally to show the app and the
+   automated test suite passing
+3. Run `.\scripts\benchmark.ps1` to build both Dockerfiles live and show the
+   real size/build-time difference
+4. Open Jenkins, trigger a build with parameters (or, once the webhook is
+   set up, push a commit and watch it start automatically), and narrate each
+   stage as it goes green in the console output
 5. Show the resulting image on Docker Hub
 6. Show the Render dashboard confirming a new deploy was triggered
 7. Open the public URL and hit `/` and `/health` in the browser to prove the
